@@ -10,8 +10,8 @@ public class SwipeDetect : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     public RectTransform shoot;
     public Image wind;
     public Canvas canvas;
-    public float minDistance = 120f;
-    public float minSpeed = 320f;
+    public float minDistance = 80f;
+    public float minSpeed = 200f;
 
     Vector2 startPos;
     float startTime;

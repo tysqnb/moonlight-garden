@@ -56,15 +56,8 @@ public static class SceneBuilder
     // 9-slice borders for the two rounded shapes (see make_sprites.py).
     static readonly Dictionary<string, Vector4> SliceBorders = new Dictionary<string, Vector4>
     {
-        { "card.png", new Vector4(40f, 40f, 40f, 40f) },
-        { "pill.png", new Vector4(60f, 60f, 60f, 60f) },
-    };
-
-    // Pixels-per-unit multiplier keeps the sliced corners at a sane size.
-    static readonly Dictionary<string, float> SliceMultipliers = new Dictionary<string, float>
-    {
-        { "card.png", 1.5f },
-        { "pill.png", 2.5f },
+        { "card.png", new Vector4(28f, 28f, 28f, 28f) },
+        { "pill.png", new Vector4(40f, 40f, 40f, 40f) },
     };
 
     static Color Hex(string hex)
@@ -137,20 +130,14 @@ public static class SceneBuilder
                          Color fill, float border, Color borderColor, bool pill = false)
     {
         Sprite shape = Shape(pill);
-        float mult = SliceMultipliers.ContainsKey(pill ? "pill.png" : "card.png")
-            ? SliceMultipliers[pill ? "pill.png" : "card.png"] : 1f;
         if (border > 0f)
         {
             RectTransform outer = At(parent, name + "_border", x, y, w, h);
-            Img(outer, shape, borderColor, Image.Type.Sliced).pixelsPerUnitMultiplier = mult;
+            Img(outer, shape, borderColor, Image.Type.Sliced);
             RectTransform inner = At(outer, name, border, border, w - border * 2f, h - border * 2f);
-            Image innerImg = Img(inner, shape, fill, Image.Type.Sliced);
-            innerImg.pixelsPerUnitMultiplier = mult;
-            return innerImg;
+            return Img(inner, shape, fill, Image.Type.Sliced);
         }
-        Image img = Img(At(parent, name, x, y, w, h), shape, fill, Image.Type.Sliced);
-        img.pixelsPerUnitMultiplier = mult;
-        return img;
+        return Img(At(parent, name, x, y, w, h), shape, fill, Image.Type.Sliced);
     }
 
     static Text Label(Transform parent, string name, float x, float y, float w, float h, string text,
@@ -471,8 +458,8 @@ public static class SceneBuilder
         SpriteAt(c, "Scene1_leaf", 250f, 1010f, 440f, 290f, "leaf_wide", White);
         SpriteAt(c, "Scene1_reed", 760f, 950f, 240f, 240f, "reed", White);
 
-        RectTransform glowRt = At(c, "Scene1_glow", 540f, 900f, 380f, 380f);
-        Image glow = Img(glowRt, Art("star"), new Color(Amber.r, Amber.g, Amber.b, 0f));
+        RectTransform glowRt = At(c, "Scene1_glow", 520f, 880f, 420f, 420f);
+        Image glow = Img(glowRt, Art("glow"), new Color(1f, 1f, 1f, 0f));
         glow.raycastTarget = false;
 
         RectTransform fireflyRt = At(c, "Scene1_firefly", 610f, 970f, 250f, 250f);
@@ -574,8 +561,8 @@ public static class SceneBuilder
         IllustrationWindow(c, 51f, 606f, 976f, 684f,
             "Illustration: closed moonflower bud with a soft glow, firefly and snail beside it");
 
-        RectTransform glowRt = At(c, "Scene4_glow", 380f, 830f, 420f, 420f);
-        Image glow = Img(glowRt, Art("star"), new Color(Amber.r, Amber.g, Amber.b, 0f));
+        RectTransform glowRt = At(c, "Scene4_glow", 360f, 810f, 460f, 460f);
+        Image glow = Img(glowRt, Art("glow"), new Color(1f, 1f, 1f, 0f));
         glow.raycastTarget = false;
 
         RectTransform trackRt = At(c, "Scene4_ring_track", 420f, 860f, 300f, 300f);

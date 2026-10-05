@@ -14,6 +14,7 @@ public class DragDrop : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
     public Color soilWatered = new Color(0.55f, 0.46f, 0.34f);
 
     Vector2 home;
+    Vector2 grabOffset;
     bool solved;
 
     void Start()
@@ -26,13 +27,22 @@ public class DragDrop : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
     {
         if (solved) return;
         drop.localScale = new Vector3(1.12f, 1.12f, 1f);
+
+        Vector2 local;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                (RectTransform)drop.parent, e.position, null, out local))
+            grabOffset = local - drop.anchoredPosition;
     }
 
     public void OnDrag(PointerEventData e)
     {
         if (solved) return;
-        float scale = canvas != null ? canvas.scaleFactor : 1f;
-        drop.anchoredPosition += e.delta / scale;
+
+        // Follow the pointer exactly, whatever the canvas scale factor is.
+        Vector2 local;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                (RectTransform)drop.parent, e.position, null, out local))
+            drop.anchoredPosition = local - grabOffset;
     }
 
     public void OnEndDrag(PointerEventData e)
