@@ -153,6 +153,9 @@ public static class SceneBuilder
         label.horizontalOverflow = HorizontalWrapMode.Wrap;
         label.verticalOverflow = VerticalWrapMode.Overflow;
         label.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
+        // Labels must never swallow clicks aimed at the control underneath them
+        // (this is what stopped "Start reading" and "Read again" from working).
+        label.raycastTarget = false;
         return label;
     }
 
