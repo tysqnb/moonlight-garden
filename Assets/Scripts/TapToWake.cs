@@ -8,6 +8,7 @@ public class TapToWake : MonoBehaviour
     public RectTransform firefly;
     public Image glow;
     public GameObject cheerText;
+    public FeedbackBurst burst;
 
     float t = -1f;
     bool awake;
@@ -26,6 +27,9 @@ public class TapToWake : MonoBehaviour
         t = 0f;
         ProgressManager.Light(2);
         if (cheerText != null) cheerText.SetActive(true);
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayChime();
+        if (burst != null && firefly != null)
+            burst.Play((RectTransform)firefly.parent, firefly.anchoredPosition + Vector2.up * 80f);
     }
 
     void Update()

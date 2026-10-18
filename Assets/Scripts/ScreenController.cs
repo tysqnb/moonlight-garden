@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -52,6 +53,14 @@ public class ScreenController : MonoBehaviour
         }
         if (backIcon != null) backIcon.color = canBack ? Color.white : dimmed;
         if (nextIcon != null) nextIcon.color = canNext ? Color.white : dimmed;
+        StartCoroutine(ReadPageAfterBeat());
+    }
+
+    IEnumerator ReadPageAfterBeat()
+    {
+        yield return new WaitForSeconds(0.3f);
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayNarration(pageIndex);
     }
 
     public void Next()

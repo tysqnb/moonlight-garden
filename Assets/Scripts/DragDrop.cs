@@ -10,6 +10,7 @@ public class DragDrop : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
     public Canvas canvas;
     public Image soil;
     public GameObject shoot;
+    public FeedbackBurst burst;
     public float snapDistance = 150f;
     public Color soilWatered = new Color(0.55f, 0.46f, 0.34f);
 
@@ -57,6 +58,9 @@ public class DragDrop : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
             if (soil != null) soil.color = soilWatered;
             if (shoot != null) shoot.SetActive(true);
             ProgressManager.Light(3);
+            if (AudioManager.Instance != null) AudioManager.Instance.PlayWater();
+            if (burst != null)
+                burst.Play((RectTransform)drop.parent, target.anchoredPosition + Vector2.up * 120f);
         }
         else
         {

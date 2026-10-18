@@ -10,6 +10,7 @@ public class SwipeDetect : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     public RectTransform shoot;
     public Image wind;
     public Canvas canvas;
+    public FeedbackBurst burst;
     public float minDistance = 80f;
     public float minSpeed = 200f;
 
@@ -31,6 +32,9 @@ public class SwipeDetect : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
         blown = true;
         ProgressManager.Light(4);
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayWind();
+        if (burst != null && shoot != null)
+            burst.Play((RectTransform)shoot.parent, shoot.anchoredPosition + Vector2.up * 120f);
         StopAllCoroutines();
         StartCoroutine(Blow());
     }

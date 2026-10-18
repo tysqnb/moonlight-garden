@@ -53,6 +53,11 @@ public static class SceneBuilder
         return AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Art/{name}.png");
     }
 
+    static AudioClip Clip(string name)
+    {
+        return AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/Audio/{name}.wav");
+    }
+
     // 9-slice borders for the two rounded shapes (see make_sprites.py).
     static readonly Dictionary<string, Vector4> SliceBorders = new Dictionary<string, Vector4>
     {
@@ -181,7 +186,26 @@ public static class SceneBuilder
     {
         Button button = graphic.gameObject.AddComponent<Button>();
         button.targetGraphic = graphic;
+        button.gameObject.AddComponent<UiClickSound>();
+        button.gameObject.AddComponent<UiPressFeedback>();
         return button;
+    }
+
+    static void Float(RectTransform rt, float amplitude = 7f, float speed = 0.8f, float rotation = 1.2f)
+    {
+        if (rt == null) return;
+        IdleFloat motion = rt.gameObject.AddComponent<IdleFloat>();
+        motion.amplitude = amplitude;
+        motion.speed = speed;
+        motion.rotation = rotation;
+        motion.phase = rt.anchoredPosition.x * 0.013f + rt.anchoredPosition.y * 0.007f;
+    }
+
+    static FeedbackBurst Burst(RectTransform rt)
+    {
+        FeedbackBurst burst = rt.gameObject.AddComponent<FeedbackBurst>();
+        burst.star = Art("star");
+        return burst;
     }
 
     /// <summary>White circle, ink outline, centred icon.</summary>
@@ -231,6 +255,20 @@ public static class SceneBuilder
 
         new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
 
+        GameObject audioGo = new GameObject("AudioManager", typeof(AudioManager));
+        AudioManager audio = audioGo.GetComponent<AudioManager>();
+        audio.ambient = Clip("ambient_pond");
+        audio.click = Clip("ui_click");
+        audio.chime = Clip("chime");
+        audio.water = Clip("water_drop");
+        audio.wind = Clip("breeze");
+        audio.bloom = Clip("bloom");
+        audio.narration = new[]
+        {
+            Clip("narration_home"), Clip("narration_scene1"), Clip("narration_scene2"),
+            Clip("narration_scene3"), Clip("narration_scene4"), Clip("narration_credits")
+        };
+
         GameObject canvasGo = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         Canvas canvas = canvasGo.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -249,7 +287,10 @@ public static class SceneBuilder
         bg.offsetMax = Vector2.zero;
         Img(bg, null, Cream).raycastTarget = false;
 
-        Label(canvasGo.transform, "TopBar_title", 44f, 50f, 560f, 50f, "Moonlight Garden", 46, Ink, TextAnchor.MiddleLeft, true);
+        Rounded(canvasGo.transform, "Masthead_banner", 28f, 16f, 744f, 116f, White, 4f, Ink, true).raycastTarget = false;
+        SpriteAt(canvasGo.transform, "Masthead_star", 688f, 45f, 58f, 58f, "star", Amber);
+        Label(canvasGo.transform, "TopBar_title", 62f, 35f, 580f, 50f, "Moonlight Garden", 42, Ink, TextAnchor.MiddleLeft, true);
+        Label(canvasGo.transform, "TopBar_subtitle", 64f, 82f, 580f, 30f, "A lantern story for small hands", 26, TextGrey, TextAnchor.MiddleLeft);
 
         Image narIcon;
         Button nar = CircleButton(canvasGo.transform, "Narration_toggle", 807f, 26f, 99f,
@@ -258,7 +299,8 @@ public static class SceneBuilder
         narToggle.icon = narIcon;
         narToggle.iconOn = Art("icon_pause");
         narToggle.iconOff = Art("icon_play");
-        narToggle.state = pageIndex != 0;
+        narToggle.narrationToggle = true;
+        narToggle.state = AudioManager.NarrationEnabled;
 
         Image sndIcon;
         Button snd = CircleButton(canvasGo.transform, "Sound_toggle", 936f, 26f, 99f, Art("icon_speaker"), out sndIcon);
@@ -266,6 +308,8 @@ public static class SceneBuilder
         sndToggle.icon = sndIcon;
         sndToggle.iconOn = Art("icon_speaker");
         sndToggle.iconOff = Art("icon_speaker_off");
+        sndToggle.soundToggle = true;
+        sndToggle.state = AudioManager.SoundEnabled;
 
         Dashes(canvasGo.transform, "TopBar_separator", 154f, 12, 54f, 36f, 4f, LineGrey);
         Dashes(canvasGo.transform, "BottomBar_separator", 1712f, 12, 54f, 36f, 4f, LineGrey);
@@ -334,26 +378,69 @@ public static class SceneBuilder
             Label(parent, "Illustration_label", x + 25f, y + 22f, w - 50f, 70f, label, 25, Hex("#5C667F"));
     }
 
+    /// <summary>
+    /// The final illustration window is a composition of separate paper layers:
+    /// sky, stars, moon, distant bank, near bank, pond, clouds and grain.
+    /// </summary>
+    static RectTransform IllustrationScene(Transform parent, float x, float y, float w, float h,
+                                            bool dawn = false, int variant = 0)
+    {
+        RectTransform outer = At(parent, "Illustration_scene", x, y, w, h);
+        Img(outer, Shape(false), Ink, Image.Type.Sliced).raycastTarget = false;
+
+        RectTransform view = At(outer, "Scene_layers", 5f, 5f, w - 10f, h - 10f);
+        Image mask = Img(view, Shape(false), White, Image.Type.Sliced);
+        mask.raycastTarget = false;
+        Mask clip = view.gameObject.AddComponent<Mask>();
+        clip.showMaskGraphic = false;
+
+        float vw = w - 10f;
+        float vh = h - 10f;
+        SpriteAt(view, "Sky", 0f, 0f, vw, vh, dawn ? "dawn_sky" : "night_sky", White);
+        SpriteAt(view, "Star_field", 20f + variant * 55f, 20f, 390f, 280f, "star_dust", White);
+        Image moon = SpriteAt(view, "Moon", variant == 2 ? vw - 235f : 74f + variant * 34f, 42f,
+                              190f, 190f, "moon", White);
+        Image cloudBack = SpriteAt(view, "Cloud_back", 350f + variant * 24f, 40f, 360f, 130f, "cloud", White);
+        Image cloudFront = SpriteAt(view, "Cloud_front", 90f, 150f, 270f, 100f, "cloud", White);
+        Float(moon.rectTransform, 3.5f, 0.35f, 0f);
+        Float(cloudBack.rectTransform, 4.5f, 0.22f, 0f);
+        Float(cloudFront.rectTransform, 3.0f, 0.3f, 0f);
+        SpriteAt(view, "Bank_far", -75f, vh - 278f, vw + 150f, 300f, "hill_far", White);
+        SpriteAt(view, "Bank_near", -95f, vh - 178f, vw + 190f, 250f, "hill_near", White);
+        SpriteAt(view, "Pond", -30f, vh - 205f, vw + 60f, 260f, "pond", White);
+        SpriteAt(view, "Lily_left", 45f + variant * 20f, vh - 112f, 180f, 90f, "lilypad", White);
+        SpriteAt(view, "Lily_right", vw - 260f, vh - 88f, 210f, 105f, "lilypad", White);
+        SpriteAt(view, "Paper_grain", 0f, 0f, vw, vh, "paper_grain", White);
+        return view;
+    }
+
     static void HintPill(Transform parent, float x, float y, float w, string icon, string text)
     {
         Rounded(parent, "Hint_pill", x, y, w, 77f, Amber, 5f, Ink, true).raycastTarget = false;
         SpriteAt(parent, "Hint_icon", x + 34f, y + 23f, 32f, 32f, icon, Ink);
-        Label(parent, "Hint_text", x + 80f, y + 12f, w - 110f, 54f, text, 30, Ink, TextAnchor.MiddleLeft, true);
+        Label(parent, "Hint_text", x + 82f, y + 11f, w - 112f, 56f, text, 31, Ink, TextAnchor.MiddleLeft, true);
     }
 
-    static void ScriptCard(Transform parent, float x, float y, float w, string script)
+    static void ScriptCard(Transform parent, float x, float y, float w, string script, int pageIndex)
     {
-        Rounded(parent, "Script_card", x, y, w, 284f, White, 4f, Ink).raycastTarget = false;
-        Label(parent, "Script_tag", x + 25f, y + 26f, 300f, 30f, "S C R I P T", 23, Ink, TextAnchor.UpperLeft, true);
-        Label(parent, "Script_text", x + 25f, y + 75f, w - 60f, 110f, script, 38, Ink);
-        SpriteAt(parent, "Script_speaker", x + 25f, y + 212f, 28f, 28f, "icon_speaker", Ink);
-        Label(parent, "Script_replay", x + 60f, y + 214f, 460f, 30f, "tap to hear this line again", 25, Hex("#3C4A66"));
+        Image card = Rounded(parent, "Script_card", x, y, w, 284f, White, 4f, Ink);
+        Button button = MakeButton(card);
+        NarrationReplay replay = card.gameObject.AddComponent<NarrationReplay>();
+        replay.pageIndex = pageIndex;
+        Label(parent, "Script_tag", x + 25f, y + 23f, 300f, 30f, "S C R I P T", 23, Ink, TextAnchor.UpperLeft, true);
+        Label(parent, "Script_text", x + 25f, y + 70f, w - 58f, 116f, script, 39, Ink);
+        SpriteAt(parent, "Script_speaker", x + 25f, y + 218f, 30f, 30f, "icon_speaker", Ink);
+        Label(parent, "Script_replay", x + 66f, y + 217f, 560f, 34f,
+              "tap the card to hear this line again", 26, Hex("#3C4A66"));
+        if (button != null) { /* the whole card is the replay target */ }
     }
 
     static void HeadingAndScript(Frame f, int page)
     {
-        Label(f.content, "Scene_heading", 44f, 176f, 960f, 44f, Headings[page], 30, Hex("#5C667F"), TextAnchor.MiddleLeft, true);
-        ScriptCard(f.content, 51f, 276f, 976f, Scripts[page]);
+        Rounded(f.content, "Chapter_banner", 51f, 168f, 976f, 88f, Amber, 4f, Ink, true).raycastTarget = false;
+        SpriteAt(f.content, "Chapter_star", 72f, 188f, 46f, 46f, "star", White);
+        Label(f.content, "Scene_heading", 136f, 186f, 860f, 52f, Headings[page], 34, Ink, TextAnchor.MiddleLeft, true);
+        ScriptCard(f.content, 51f, 276f, 976f, Scripts[page], page);
     }
 
     static readonly string[] Headings =
@@ -422,15 +509,16 @@ public static class SceneBuilder
         Frame f = NewFrame("Home", 0);
         Transform c = f.content;
 
-        IllustrationWindow(c, 51f, 240f, 976f, 741f,
-            "Illustration: paper-cut night garden, moonlight on the pond, one firefly asleep on a leaf");
-        SpriteAt(c, "Home_star", 120f, 300f, 130f, 130f, "star", Amber);
-        SpriteAt(c, "Home_leaf", 300f, 700f, 460f, 300f, "leaf_wide", White);
-        SpriteAt(c, "Home_firefly", 430f, 470f, 250f, 250f, "firefly", White);
+        IllustrationScene(c, 51f, 240f, 976f, 741f, false, 0);
+        SpriteAt(c, "Home_star", 760f, 330f, 92f, 92f, "star", Amber);
+        Image homeLeaf = SpriteAt(c, "Home_leaf", 300f, 700f, 460f, 300f, "leaf_wide", White);
+        Image homeFirefly = SpriteAt(c, "Home_firefly", 430f, 470f, 250f, 250f, "firefly", White);
+        Float(homeLeaf.rectTransform, 2.5f, 0.5f, 0.5f);
+        Float(homeFirefly.rectTransform, 8f, 0.8f, 1.8f);
 
-        LabelCentred(c, "Home_title", 1030f, 960f, 110f, "Moonlight Garden", 80, Ink, true);
-        LabelCentred(c, "Home_subtitle", 1160f, 960f, 50f,
-            "A lantern story about a small light and a sleepy flower", 40, TextGrey);
+        LabelCentred(c, "Home_title", 1008f, 960f, 100f, "Moonlight Garden", 72, Ink, true);
+        LabelCentred(c, "Home_subtitle", 1116f, 960f, 54f,
+            "A lantern story about a small light and a sleepy flower", 31, TextGrey);
 
         Image startImg = Rounded(c, "Start_button", 365f, 1251f, 348f, 114f, Amber, 5f, Ink, true);
         Label(c, "Start_label", 365f, 1284f, 348f, 60f, "Start reading", 42, Ink, TextAnchor.MiddleCenter, true);
@@ -439,12 +527,18 @@ public static class SceneBuilder
         startNav.controller = f.controller;
         startNav.action = 1;
 
-        Rounded(c, "Read_chip", 390f, 1402f, 298f, 63f, White, 3f, Ink, true).raycastTarget = false;
-        SpriteAt(c, "Read_chip_icon", 414f, 1423f, 26f, 26f, "icon_play", Ink);
-        Label(c, "Read_chip_text", 446f, 1416f, 240f, 36f, "Read to me: on", 27, Ink, TextAnchor.MiddleLeft);
+        Image readChip = Rounded(c, "Read_chip", 375f, 1402f, 330f, 68f, White, 3f, Ink, true);
+        Button readButton = MakeButton(readChip);
+        NarrationChip narrChip = readChip.gameObject.AddComponent<NarrationChip>();
+        narrChip.icon = SpriteAt(c, "Read_chip_icon", 400f, 1420f, 32f, 32f, "icon_pause", Ink);
+        narrChip.label = Label(c, "Read_chip_text", 444f, 1414f, 240f, 40f,
+                               "Read to me: on", 28, Ink, TextAnchor.MiddleLeft);
+        narrChip.iconOn = Art("icon_pause");
+        narrChip.iconOff = Art("icon_play");
+        if (readButton != null) { /* the chip handles its own toggle */ }
 
-        LabelCentred(c, "Home_tip", 1522f, 960f, 40f,
-            "Tip: one tap starts the story, a second tap reads any line aloud", 24, TextGrey);
+        LabelCentred(c, "Home_tip", 1524f, 960f, 44f,
+            "One tap starts the story. Tap any script card to hear that line.", 29, TextGrey);
         Save(f);
     }
 
@@ -454,10 +548,9 @@ public static class SceneBuilder
         Transform c = f.content;
 
         HeadingAndScript(f, 1);
-        IllustrationWindow(c, 51f, 606f, 976f, 684f,
-            "Illustration: moon low over the pond, firefly rubbing its eyes on a leaf");
+        IllustrationScene(c, 51f, 606f, 976f, 684f, false, 1);
 
-        SpriteAt(c, "Scene1_star", 150f, 660f, 150f, 150f, "star", Amber);
+        SpriteAt(c, "Scene1_star", 780f, 675f, 108f, 108f, "star", Amber);
         SpriteAt(c, "Scene1_leaf", 250f, 1010f, 440f, 290f, "leaf_wide", White);
         SpriteAt(c, "Scene1_reed", 760f, 950f, 240f, 240f, "reed", White);
 
@@ -471,14 +564,16 @@ public static class SceneBuilder
         TapToWake wake = fireflyRt.gameObject.AddComponent<TapToWake>();
         wake.firefly = fireflyRt;
         wake.glow = glow;
+        wake.burst = Burst(fireflyRt);
+        Float(fireflyRt, 8f, 0.95f, 2.2f);
 
-        Text cheer = Label(c, "Scene1_cheer", 600f, 1290f, 260f, 40f, "good evening!", 28, Sage, TextAnchor.MiddleCenter, true);
+        Text cheer = Label(c, "Scene1_cheer", 552f, 865f, 360f, 46f, "good evening!", 30, Sage, TextAnchor.MiddleCenter, true);
         cheer.gameObject.SetActive(false);
         wake.cheerText = cheer.gameObject;
 
         HintPill(c, 206f, 1339f, 668f, "icon_tap", "Tap the firefly to say good evening");
-        LabelCentred(c, "Scene1_progress", 1479f, 960f, 36f, ProgressText[1], 23, TextGrey);
-        LabelCentred(c, "Scene1_audio", 1515f, 960f, 36f, AudioText[1], 23, Hex("#8A93A8"));
+        LabelCentred(c, "Scene1_progress", 1479f, 960f, 38f, ProgressText[1], 25, TextGrey);
+        LabelCentred(c, "Scene1_audio", 1517f, 960f, 38f, AudioText[1], 25, Hex("#5F6A80"));
         Save(f);
     }
 
@@ -488,8 +583,7 @@ public static class SceneBuilder
         Transform c = f.content;
 
         HeadingAndScript(f, 2);
-        IllustrationWindow(c, 51f, 606f, 976f, 684f,
-            "Illustration: snail on a stone, seed asleep in dark soil, dew drop above");
+        IllustrationScene(c, 51f, 606f, 976f, 684f, false, 2);
 
         Image soil = Rounded(c, "Scene2_soil", 300f, 1030f, 300f, 140f, Sand, 6f, Ink);
         soil.raycastTarget = false;
@@ -512,10 +606,11 @@ public static class SceneBuilder
         drag.canvas = f.canvas;
         drag.soil = soil;
         drag.shoot = shootImg.gameObject;
+        drag.burst = Burst(dropRt);
 
         HintPill(c, 236f, 1339f, 607f, "icon_drag", "Drag the dew drop to the seed");
-        LabelCentred(c, "Scene2_progress", 1479f, 960f, 36f, ProgressText[2], 23, TextGrey);
-        LabelCentred(c, "Scene2_audio", 1515f, 960f, 36f, AudioText[2], 23, Hex("#8A93A8"));
+        LabelCentred(c, "Scene2_progress", 1479f, 960f, 38f, ProgressText[2], 25, TextGrey);
+        LabelCentred(c, "Scene2_audio", 1517f, 960f, 38f, AudioText[2], 25, Hex("#5F6A80"));
         Save(f);
     }
 
@@ -525,8 +620,7 @@ public static class SceneBuilder
         Transform c = f.content;
 
         HeadingAndScript(f, 3);
-        IllustrationWindow(c, 51f, 606f, 976f, 684f,
-            "Illustration: reeds bent by a breeze, young shoot swaying, leaves in the air");
+        IllustrationScene(c, 51f, 606f, 976f, 684f, false, 3);
 
         RectTransform reedsRt = At(c, "Scene3_reeds", 560f, 860f, 420f, 420f);
         Image reedsImg = Img(reedsRt, Art("reed"), White);
@@ -536,7 +630,7 @@ public static class SceneBuilder
         Image shootImg = Img(shootRt, Art("shoot"), White);
         shootImg.raycastTarget = false;
 
-        RectTransform windRt = At(c, "Scene3_wind", 260f, 700f, 384f, 168f);
+        RectTransform windRt = At(c, "Scene3_wind", 320f, 790f, 384f, 168f);
         Image windImg = Img(windRt, Art("wind"), new Color(LineGrey.r, LineGrey.g, LineGrey.b, 0.9f));
         windImg.raycastTarget = false;
         windImg.gameObject.SetActive(false);
@@ -548,10 +642,12 @@ public static class SceneBuilder
         swipe.shoot = shootRt;
         swipe.wind = windImg;
         swipe.canvas = f.canvas;
+        swipe.burst = Burst(catcher);
+        Float(shootRt, 4f, 1.4f, 2.5f);
 
         HintPill(c, 159f, 1339f, 762f, "icon_swipe", "Swipe across the reeds to call the breeze");
-        LabelCentred(c, "Scene3_progress", 1479f, 960f, 36f, ProgressText[3], 23, TextGrey);
-        LabelCentred(c, "Scene3_audio", 1515f, 960f, 36f, AudioText[3], 23, Hex("#8A93A8"));
+        LabelCentred(c, "Scene3_progress", 1479f, 960f, 38f, ProgressText[3], 25, TextGrey);
+        LabelCentred(c, "Scene3_audio", 1517f, 960f, 38f, AudioText[3], 25, Hex("#5F6A80"));
         Save(f);
     }
 
@@ -561,8 +657,7 @@ public static class SceneBuilder
         Transform c = f.content;
 
         HeadingAndScript(f, 4);
-        IllustrationWindow(c, 51f, 606f, 976f, 684f,
-            "Illustration: closed moonflower bud with a soft glow, firefly and snail beside it");
+        IllustrationScene(c, 51f, 606f, 976f, 684f, false, 4);
 
         RectTransform glowRt = At(c, "Scene4_glow", 360f, 810f, 460f, 460f);
         Image glow = Img(glowRt, Art("glow"), new Color(1f, 1f, 1f, 0f));
@@ -592,10 +687,12 @@ public static class SceneBuilder
         hold.glow = glow;
         hold.budClosed = Art("moonflower_bud");
         hold.budOpen = Art("moonflower_open");
+        hold.burst = Burst(budRt);
+        Float(budRt, 4f, 0.9f, 1.4f);
 
         HintPill(c, 187f, 1339f, 706f, "icon_hold", "Press and hold the bud until it opens");
-        LabelCentred(c, "Scene4_progress", 1479f, 960f, 36f, ProgressText[4], 23, TextGrey);
-        LabelCentred(c, "Scene4_audio", 1515f, 960f, 36f, AudioText[4], 23, Hex("#8A93A8"));
+        LabelCentred(c, "Scene4_progress", 1479f, 960f, 38f, ProgressText[4], 25, TextGrey);
+        LabelCentred(c, "Scene4_audio", 1517f, 960f, 38f, AudioText[4], 25, Hex("#5F6A80"));
         Save(f);
     }
 
@@ -604,20 +701,19 @@ public static class SceneBuilder
         Frame f = NewFrame("Credits", 5);
         Transform c = f.content;
 
-        IllustrationWindow(c, 51f, 216f, 976f, 486f,
-            "Illustration: the opened moonflower, six lanterns lit around the pond");
+        IllustrationScene(c, 51f, 216f, 976f, 486f, true, 5);
         SpriteAt(c, "Credits_flower", 430f, 300f, 220f, 220f, "moonflower_open", White);
-        SpriteAt(c, "Credits_star", 140f, 260f, 120f, 120f, "star", Amber);
+        SpriteAt(c, "Credits_star", 804f, 266f, 108f, 108f, "star", Amber);
 
         LabelCentred(c, "Credits_title", 745f, 960f, 100f, "Credits", 70, Ink, true);
 
         Rounded(c, "Credits_card", 51f, 853f, 976f, 404f, White, 4f, Ink).raycastTarget = false;
         Label(c, "Credits_text", 76f, 886f, 920f, 350f,
-            "Story, art direction and wireframes: Zihao Wang\n" +
-            "Narration: recorded by the author\n" +
-            "Music and ambience: garden recordings, edited by the author\n" +
-            "Sound design: crickets, water, paper rustle\n" +
-            "Special thanks: the night gardeners of the pond",
+            "Story, illustration and interaction design: Zihao Wang\n" +
+            "Unity development: Zihao Wang\n" +
+            "Ambient sound and interaction cues: original procedural audio\n" +
+            "Read-aloud voice: system speech synthesis, edited for pacing\n" +
+            "Thanks for reading with us",
             34, Ink);
 
         Image againImg = Rounded(c, "Read_again", 390f, 1311f, 300f, 105f, Amber, 5f, Ink, true);
@@ -627,8 +723,8 @@ public static class SceneBuilder
         againNav.controller = f.controller;
         againNav.action = 2;
 
-        LabelCentred(c, "Credits_note", 1480f, 960f, 36f,
-            "prefers-reduced-motion: lanterns rest instead of glow", 23, TextGrey);
+        LabelCentred(c, "Credits_note", 1480f, 960f, 40f,
+            "Original six-screen Unity storybook - built for portrait phones", 25, TextGrey);
         Save(f);
     }
 

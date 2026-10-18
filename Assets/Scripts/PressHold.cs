@@ -10,6 +10,7 @@ public class PressHold : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     public Image glow;
     public Sprite budClosed;
     public Sprite budOpen;
+    public FeedbackBurst burst;
     public float holdSeconds = 3f;
 
     bool holding;
@@ -45,6 +46,9 @@ public class PressHold : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                 holding = false;
                 if (budImage != null) budImage.sprite = budOpen;
                 ProgressManager.Light(5);
+                if (AudioManager.Instance != null) AudioManager.Instance.PlayBloom();
+                if (burst != null && budImage != null)
+                    burst.Play((RectTransform)budImage.transform.parent, budImage.rectTransform.anchoredPosition + Vector2.up * 90f);
             }
         }
 

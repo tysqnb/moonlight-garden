@@ -9,9 +9,13 @@ public class ToggleIcon : MonoBehaviour
     public Sprite iconOn;
     public Sprite iconOff;
     public bool state = true;
+    public bool soundToggle;
+    public bool narrationToggle;
 
     void Start()
     {
+        if (soundToggle) state = AudioManager.SoundEnabled;
+        if (narrationToggle) state = AudioManager.NarrationEnabled;
         GetComponent<Button>().onClick.AddListener(Toggle);
         Apply();
     }
@@ -20,6 +24,9 @@ public class ToggleIcon : MonoBehaviour
     {
         state = !state;
         Apply();
+        if (AudioManager.Instance == null) return;
+        if (soundToggle) AudioManager.Instance.SetSound(state);
+        if (narrationToggle) AudioManager.Instance.SetNarration(state);
     }
 
     void Apply()
