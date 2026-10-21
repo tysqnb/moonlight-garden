@@ -336,16 +336,19 @@ public static class SceneBuilder
         controller.lanterns = new Image[6];
         controller.rings = new Image[6];
 
-        float[] centres = { 349f, 426f, 501f, 576f, 652f, 728f };
+        // Keep the six lantern targets at 99 units and the current-page rings
+        // at 108 units. The wider spacing prevents neighbouring targets from
+        // overlapping while keeping the row centred on the canvas.
+        float[] centres = { 260f, 370f, 480f, 590f, 700f, 810f };
         for (int i = 0; i < 6; i++)
         {
-            RectTransform ringRt = At(canvasGo.transform, "Lantern_ring_" + (i + 1), centres[i] - 43f, 1773f, 86f, 86f);
+            RectTransform ringRt = At(canvasGo.transform, "Lantern_ring_" + (i + 1), centres[i] - 54f, 1762f, 108f, 108f);
             Image ringImg = Img(ringRt, KnobSprite, Sage);
             ringImg.raycastTarget = false;
             ringImg.enabled = false;
             controller.rings[i] = ringImg;
 
-            RectTransform lanternRt = At(canvasGo.transform, "Lantern_" + (i + 1), centres[i] - 34f, 1782f, 68f, 68f);
+            RectTransform lanternRt = At(canvasGo.transform, "Lantern_" + (i + 1), centres[i] - 49.5f, 1766.5f, 99f, 99f);
             Image lanternImg = Img(lanternRt, Art("lantern_off"), White);
             MakeButton(lanternImg);
             LanternButton lb = lanternRt.gameObject.AddComponent<LanternButton>();
@@ -527,7 +530,7 @@ public static class SceneBuilder
         startNav.controller = f.controller;
         startNav.action = 1;
 
-        Image readChip = Rounded(c, "Read_chip", 375f, 1402f, 330f, 68f, White, 3f, Ink, true);
+        Image readChip = Rounded(c, "Read_chip", 375f, 1386f, 330f, 99f, White, 3f, Ink, true);
         Button readButton = MakeButton(readChip);
         NarrationChip narrChip = readChip.gameObject.AddComponent<NarrationChip>();
         narrChip.icon = SpriteAt(c, "Read_chip_icon", 400f, 1420f, 32f, 32f, "icon_pause", Ink);
